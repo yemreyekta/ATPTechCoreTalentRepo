@@ -93,7 +93,3 @@ Imagine you are tasked with building a component for a smart camera system. Your
 ---
 
 **Good luck! Show us your best hands-on AI skills!**
-
----
-
-**Let me know if you want this in a downloadable `.md` file!**
