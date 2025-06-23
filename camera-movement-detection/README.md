@@ -2,13 +2,6 @@
 # 2025
 ATPTech Core Talent Repo
 
-# Camera Movement Detection Challenge
-
-This project is a starter kit for detecting significant camera movement from a sequence of images using computer vision techniques.
-
-## 📸 Challenge Overview
-
-Build an algorithm that detects *significant movement* of a camera (e.g., shake, tilt, pan) by analyzing consecutive image frames.
 
 **Your tasks:**
 - Implement movement detection logic in `movement_detector.py`
@@ -26,15 +19,6 @@ Build an algorithm that detects *significant movement* of a camera (e.g., shake,
 3. Add or use sample frames in `test_images/`
 4. Run locally:  
 
----
-
-## 📝 Deliverables
-
-- Publicly deployed app URL
-- Updated GitHub repo (this one or your fork)
-- Complete README with approach and instructions
-
----
 
 ## 📂 Files
 
