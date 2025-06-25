@@ -1,33 +1,23 @@
 import cv2
 import numpy as np
-from typing import List, Optional, Tuple, Generator
+from typing import List, Optional, Tuple
+
+
+import cv2
+import numpy as np
+from typing import List, Optional, Tuple
 
 
 def preprocess_frame(frame: np.ndarray) -> np.ndarray:
     """
-    Verilen bir görüntü karesini ön işler (ör. gri tonlamaya çevirir).
-    Args:
-        frame: BGR formatında bir numpy görüntü karesi.
-    Returns:
-        Gri tonlamalı numpy görüntü karesi.
+    Kareyi güvenli şekilde gri tonlamaya çevirir.
+    1 kanallıysa dokunmaz, 4 kanallıysa BGRA→BGR'e indirger.
     """
+    if frame.ndim == 2:                     # (H, W)
+        return frame
+    if frame.shape[2] == 4:                 # (H, W, 4)
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
     return cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-
-def bgr2rgb(image: np.ndarray) -> np.ndarray:
-    """BGR görüntüyü RGB'ye çevirir (Streamlit için)."""
-    return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-
-def frame_generator(video_path: str) -> Generator[np.ndarray, None, None]:
-    """Bir video dosyasından kareleri jeneratör olarak döndürür."""
-    cap = cv2.VideoCapture(video_path)
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        yield frame
-    cap.release()
 
 
 def frame_difference(prev_frame: np.ndarray, curr_frame: np.ndarray) -> np.ndarray:
@@ -223,16 +213,15 @@ def detect_camera_and_object_movement(
     return camera_movement_indices, object_movement_indices, camera_annotated_frames
 
 
-def detect_motion_streamlit(
+def detect_motion_robust(
     frames: List[np.ndarray],
     cam_motion_thresh: float = 2.0,
     obj_area_thresh: int = 500
 ) -> Tuple[List[int], List[int], List[np.ndarray], List[np.ndarray]]:
     """
     Optik akış ile kamera hareketi, MOG2+kontur ile nesne hareketi tespit eder.
-    Streamlit ile uyumlu, sadece gerekli görselleri RGB olarak döndürür.
     Args:
-        frames: Kare listesi (BGR).
+        frames: Kare listesi (RGB veya BGR).
         cam_motion_thresh: Kamera hareketi için ortalama optik akış büyüklüğü eşiği.
         obj_area_thresh: Nesne hareketi için minimum kontur alanı.
     Returns:
@@ -245,10 +234,13 @@ def detect_motion_streamlit(
     prev_gray = None
     fgbg = cv2.createBackgroundSubtractorMOG2(history=100, varThreshold=50, detectShadows=False)
     for idx, frame in enumerate(frames):
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        if frame.shape[-1] == 3:
+            gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY) if frame[...,0].max()>1 else frame
+        else:
+            gray = frame if len(frame.shape)==2 else frame[...,0]
         # Kamera hareketi: optik akış
         cam_move = False
-        cam_vis = frame  # Kopya almadan, gerekirse sadece görselleştirme için kopyala
+        cam_vis = frame.copy()
         if prev_gray is not None:
             flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
             mag, ang = cv2.cartToPolar(flow[...,0], flow[...,1])
@@ -256,7 +248,6 @@ def detect_motion_streamlit(
             if mean_mag > cam_motion_thresh:
                 cam_move = True
                 # Görselleştirme: optik akış vektörleri
-                cam_vis = frame.copy()
                 step = 16
                 for y in range(0, flow.shape[0], step):
                     for x in range(0, flow.shape[1], step):
@@ -264,24 +255,22 @@ def detect_motion_streamlit(
                         cv2.arrowedLine(cam_vis, (x, y), (int(x+fx), int(y+fy)), (0,0,255), 1, tipLength=0.4)
         if cam_move:
             camera_movement_indices.append(idx)
-            camera_annotated.append(bgr2rgb(cam_vis))
+            camera_annotated.append(cam_vis)
         # Nesne hareketi: MOG2 + kontur
         fgmask = fgbg.apply(frame)
         th = cv2.threshold(fgmask, 200, 255, cv2.THRESH_BINARY)[1]
         contours, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        obj_vis = frame.copy()
         found_obj = False
-        obj_vis = frame
         for cnt in contours:
             area = cv2.contourArea(cnt)
             if area > obj_area_thresh:
                 found_obj = True
-                if obj_vis is frame:
-                    obj_vis = frame.copy()
                 x, y, w, h = cv2.boundingRect(cnt)
                 cv2.rectangle(obj_vis, (x, y), (x+w, y+h), (0,255,0), 2)
                 cv2.drawContours(obj_vis, [cnt], -1, (255,0,0), 1)
         if found_obj:
             object_movement_indices.append(idx)
-            object_annotated.append(bgr2rgb(obj_vis))
+            object_annotated.append(obj_vis)
         prev_gray = gray
     return camera_movement_indices, object_movement_indices, camera_annotated, object_annotated
