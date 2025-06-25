@@ -3,21 +3,36 @@ import numpy as np
 from typing import List, Optional, Tuple
 
 
-import cv2
-import numpy as np
-from typing import List, Optional, Tuple
-
-
-def preprocess_frame(frame: np.ndarray) -> np.ndarray:
+def preprocess_frame(frame: np.ndarray, max_size: int = 720) -> np.ndarray:
     """
-    Kareyi güvenli şekilde gri tonlamaya çevirir.
-    1 kanallıysa dokunmaz, 4 kanallıysa BGRA→BGR'e indirger.
+    Verilen bir görüntü karesini ön işler (gri ton + isteğe bağlı yeniden boyutlandırma).
+    Args:
+        frame: BGR, RGB veya gri formatında bir numpy görüntü karesi.
+        max_size: Maksimum uzun kenar boyutu (daha büyükse küçültülür).
+    Returns:
+        Gri tonlamalı ve uygun boyutta numpy görüntü karesi.
     """
-    if frame.ndim == 2:                     # (H, W)
-        return frame
-    if frame.shape[2] == 4:                 # (H, W, 4)
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
-    return cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    # Zaten gri ise
+    if len(frame.shape) == 2:
+        gray = frame
+    elif frame.shape[-1] == 1:
+        gray = frame[..., 0]
+    else:
+        # BGR veya RGB ise griye çevir
+        if frame.shape[-1] == 3:
+            # Renk uzayını tahmin et
+            if np.mean(frame[..., 0]) > np.mean(frame[..., 2]):  # BGR mi RGB mi kaba tahmin
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            else:
+                gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+        else:
+            gray = frame[..., 0]
+    # Yeniden boyutlandırma
+    h, w = gray.shape[:2]
+    if max(h, w) > max_size:
+        scale = max_size / max(h, w)
+        gray = cv2.resize(gray, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+    return gray
 
 
 def frame_difference(prev_frame: np.ndarray, curr_frame: np.ndarray) -> np.ndarray:
@@ -43,19 +58,20 @@ def calculate_difference_score(diff: np.ndarray) -> float:
     return float(np.mean(diff))
 
 
-def detect_significant_movement(frames: List[np.ndarray], threshold: float = 50.0) -> List[int]:
+def detect_significant_movement(frames: List[np.ndarray], threshold: float = 50.0, max_size: int = 720) -> List[int]:
     """
     Kamerada anlamlı hareket olan karelerin indekslerini tespit eder.
     Args:
         frames: Görüntü karelerinin listesi (numpy array olarak).
         threshold: Hareket tespiti için hassasiyet eşiği.
+        max_size: Maksimum uzun kenar boyutu (daha büyükse küçültülür).
     Returns:
         Anlamlı hareket tespit edilen karelerin indekslerinin listesi.
     """
     movement_indices: List[int] = []
     prev_gray: Optional[np.ndarray] = None
     for idx, frame in enumerate(frames):
-        gray = preprocess_frame(frame)
+        gray = preprocess_frame(frame, max_size=max_size)
         if prev_gray is not None:
             diff = frame_difference(prev_gray, gray)
             score = calculate_difference_score(diff)
@@ -66,7 +82,7 @@ def detect_significant_movement(frames: List[np.ndarray], threshold: float = 50.
 
 
 def detect_significant_movement_orb(
-    frames: List[np.ndarray], threshold: float = 10.0, min_matches: int = 10
+    frames: List[np.ndarray], threshold: float = 10.0, min_matches: int = 10, max_size: int = 720
 ) -> List[int]:
     """
     ORB ve homografi kullanarak global kamera hareketini tespit eder.
@@ -74,6 +90,7 @@ def detect_significant_movement_orb(
         frames: Görüntü karelerinin listesi (numpy array olarak).
         threshold: Hareket tespiti için homografi dönüşüm büyüklüğü eşiği.
         min_matches: Homografi için gerekli minimum eşleşme sayısı.
+        max_size: Maksimum uzun kenar boyutu (daha büyükse küçültülür).
     Returns:
         Anlamlı hareket tespit edilen karelerin indekslerinin listesi.
     """
@@ -82,7 +99,7 @@ def detect_significant_movement_orb(
     bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
     prev_kp, prev_des = None, None
     for idx, frame in enumerate(frames):
-        gray = preprocess_frame(frame)
+        gray = preprocess_frame(frame, max_size=max_size)
         kp, des = orb.detectAndCompute(gray, None)
         if prev_kp is not None and prev_des is not None and des is not None:
             matches = bf.match(prev_des, des)
@@ -148,7 +165,9 @@ def detect_camera_and_object_movement(
     frames: List[np.ndarray],
     homography_threshold: float = 10.0,
     diff_threshold: float = 50.0,
-    min_matches: int = 10
+    min_matches: int = 10,
+    max_size: int = 720,
+    return_visuals: bool = False
 ) -> Tuple[List[int], List[int], List[np.ndarray]]:
     """
     Hem kamera (global) hem de nesne (lokal) hareketini tespit eder ve kamera hareketi olan karelerde görsel açıklama döner.
@@ -157,6 +176,8 @@ def detect_camera_and_object_movement(
         homography_threshold: Kamera hareketi için homografi büyüklüğü eşiği.
         diff_threshold: Nesne hareketi için kare farkı eşiği.
         min_matches: Homografi için gerekli minimum eşleşme sayısı.
+        max_size: Maksimum uzun kenar boyutu (daha büyükse küçültülür).
+        return_visuals: Görsel açıklama dönüp dönmeyeceğini belirtir.
     Returns:
         (kamera_hareket_indeksleri, nesne_hareket_indeksleri, kamera_hareket_annotated_frames)
     """
@@ -169,7 +190,7 @@ def detect_camera_and_object_movement(
     prev_gray = None
     prev_frame = None
     for idx, frame in enumerate(frames):
-        gray = preprocess_frame(frame)
+        gray = preprocess_frame(frame, max_size=max_size)
         kp, des = orb.detectAndCompute(gray, None)
         local_change = False
         global_change = False
@@ -202,7 +223,7 @@ def detect_camera_and_object_movement(
         # Sınıflandırma
         if global_change and local_change:
             camera_movement_indices.append(idx)
-            if prev_frame is not None:
+            if return_visuals and prev_frame is not None:
                 annotated = annotate_camera_movement(prev_frame, frame, prev_kp, kp, matches, H)
                 camera_annotated_frames.append(annotated)
         elif local_change and not global_change:
@@ -210,13 +231,18 @@ def detect_camera_and_object_movement(
         prev_kp, prev_des = kp, des
         prev_gray = gray
         prev_frame = frame
-    return camera_movement_indices, object_movement_indices, camera_annotated_frames
+    if return_visuals:
+        return camera_movement_indices, object_movement_indices, camera_annotated_frames
+    else:
+        return camera_movement_indices, object_movement_indices, []
 
 
 def detect_motion_robust(
     frames: List[np.ndarray],
     cam_motion_thresh: float = 2.0,
-    obj_area_thresh: int = 500
+    obj_area_thresh: int = 500,
+    max_size: int = 720,
+    return_visuals: bool = False
 ) -> Tuple[List[int], List[int], List[np.ndarray], List[np.ndarray]]:
     """
     Optik akış ile kamera hareketi, MOG2+kontur ile nesne hareketi tespit eder.
@@ -224,6 +250,8 @@ def detect_motion_robust(
         frames: Kare listesi (RGB veya BGR).
         cam_motion_thresh: Kamera hareketi için ortalama optik akış büyüklüğü eşiği.
         obj_area_thresh: Nesne hareketi için minimum kontur alanı.
+        max_size: Maksimum uzun kenar boyutu (daha büyükse küçültülür).
+        return_visuals: Görsel açıklama dönüp dönmeyeceğini belirtir.
     Returns:
         (kamera_hareket_indeksleri, nesne_hareket_indeksleri, kamera_annotated, nesne_annotated)
     """
@@ -234,43 +262,48 @@ def detect_motion_robust(
     prev_gray = None
     fgbg = cv2.createBackgroundSubtractorMOG2(history=100, varThreshold=50, detectShadows=False)
     for idx, frame in enumerate(frames):
-        if frame.shape[-1] == 3:
-            gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY) if frame[...,0].max()>1 else frame
-        else:
-            gray = frame if len(frame.shape)==2 else frame[...,0]
-        # Kamera hareketi: optik akış
+        gray = preprocess_frame(frame, max_size=max_size)
         cam_move = False
-        cam_vis = frame.copy()
+        cam_vis = None
         if prev_gray is not None:
             flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
             mag, ang = cv2.cartToPolar(flow[...,0], flow[...,1])
             mean_mag = np.mean(mag)
             if mean_mag > cam_motion_thresh:
                 cam_move = True
-                # Görselleştirme: optik akış vektörleri
-                step = 16
-                for y in range(0, flow.shape[0], step):
-                    for x in range(0, flow.shape[1], step):
-                        fx, fy = flow[y, x]
-                        cv2.arrowedLine(cam_vis, (x, y), (int(x+fx), int(y+fy)), (0,0,255), 1, tipLength=0.4)
+                if return_visuals:
+                    cam_vis = frame.copy()
+                    step = 16
+                    for y in range(0, flow.shape[0], step):
+                        for x in range(0, flow.shape[1], step):
+                            fx, fy = flow[y, x]
+                            cv2.arrowedLine(cam_vis, (x, y), (int(x+fx), int(y+fy)), (0,0,255), 1, tipLength=0.4)
         if cam_move:
             camera_movement_indices.append(idx)
-            camera_annotated.append(cam_vis)
+            if return_visuals and cam_vis is not None:
+                camera_annotated.append(cam_vis)
         # Nesne hareketi: MOG2 + kontur
         fgmask = fgbg.apply(frame)
         th = cv2.threshold(fgmask, 200, 255, cv2.THRESH_BINARY)[1]
         contours, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        obj_vis = frame.copy()
+        obj_vis = None
         found_obj = False
         for cnt in contours:
             area = cv2.contourArea(cnt)
             if area > obj_area_thresh:
                 found_obj = True
-                x, y, w, h = cv2.boundingRect(cnt)
-                cv2.rectangle(obj_vis, (x, y), (x+w, y+h), (0,255,0), 2)
-                cv2.drawContours(obj_vis, [cnt], -1, (255,0,0), 1)
+                if return_visuals:
+                    if obj_vis is None:
+                        obj_vis = frame.copy()
+                    x, y, w, h = cv2.boundingRect(cnt)
+                    cv2.rectangle(obj_vis, (x, y), (x+w, y+h), (0,255,0), 2)
+                    cv2.drawContours(obj_vis, [cnt], -1, (255,0,0), 1)
         if found_obj:
             object_movement_indices.append(idx)
-            object_annotated.append(obj_vis)
+            if return_visuals and obj_vis is not None:
+                object_annotated.append(obj_vis)
         prev_gray = gray
-    return camera_movement_indices, object_movement_indices, camera_annotated, object_annotated
+    if return_visuals:
+        return camera_movement_indices, object_movement_indices, camera_annotated, object_annotated
+    else:
+        return camera_movement_indices, object_movement_indices, [], []
