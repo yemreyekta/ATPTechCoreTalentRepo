@@ -1,4 +1,4 @@
-import cv2
+import cv2 
 import numpy as np
 from typing import List, Optional, Tuple
 
@@ -59,6 +59,32 @@ def detect_significant_movement(frames: List[np.ndarray], threshold: float = 50.
     return movement_indices
 
 
+def get_keypoints_and_descriptors(orb, frame: np.ndarray):
+    gray = preprocess_frame(frame)
+    return orb.detectAndCompute(gray, None)
+
+
+def compute_homography_and_motion(prev_kp, prev_des, kp, des, bf, min_matches, threshold):
+    if prev_kp is not None and prev_des is not None and des is not None:
+        matches = bf.match(prev_des, des)
+        matches = sorted(matches, key=lambda x: x.distance)
+        if len(matches) >= min_matches:
+            src_pts = np.float32([prev_kp[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
+            dst_pts = np.float32([kp[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
+            try:
+                H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
+                if H is not None:
+                    dx = H[0, 2]
+                    dy = H[1, 2]
+                    da = np.arctan2(H[1, 0], H[0, 0])
+                    motion_magnitude = np.sqrt(dx ** 2 + dy ** 2) + abs(da)
+                    if motion_magnitude > threshold:
+                        return True, matches, H
+            except cv2.error:
+                pass
+    return False, [], None
+
+
 def detect_significant_movement_orb(
     frames: List[np.ndarray], threshold: float = 10.0, min_matches: int = 10
 ) -> List[int]:
@@ -76,25 +102,10 @@ def detect_significant_movement_orb(
     bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
     prev_kp, prev_des = None, None
     for idx, frame in enumerate(frames):
-        gray = preprocess_frame(frame)
-        kp, des = orb.detectAndCompute(gray, None)
-        if prev_kp is not None and prev_des is not None and des is not None:
-            matches = bf.match(prev_des, des)
-            matches = sorted(matches, key=lambda x: x.distance)
-            if len(matches) >= min_matches:
-                src_pts = np.float32([prev_kp[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
-                dst_pts = np.float32([kp[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
-                try:
-                    H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
-                    if H is not None:
-                        dx = H[0, 2]
-                        dy = H[1, 2]
-                        da = np.arctan2(H[1, 0], H[0, 0])
-                        motion_magnitude = np.sqrt(dx ** 2 + dy ** 2) + abs(da)
-                        if motion_magnitude > threshold:
-                            movement_indices.append(idx)
-                except cv2.error:
-                    pass  # Homografi bulunamazsa atla
+        kp, des = get_keypoints_and_descriptors(orb, frame)
+        moved, _, _ = compute_homography_and_motion(prev_kp, prev_des, kp, des, bf, min_matches, threshold)
+        if moved:
+            movement_indices.append(idx)
         prev_kp, prev_des = kp, des
     return movement_indices
 
@@ -168,7 +179,6 @@ def detect_camera_and_object_movement(
         local_change = False
         global_change = False
         diff_score = None
-        motion_magnitude = None
         matches = []
         H = None
         if prev_gray is not None:
@@ -176,23 +186,7 @@ def detect_camera_and_object_movement(
             diff_score = calculate_difference_score(diff)
             if diff_score > diff_threshold:
                 local_change = True
-        if prev_kp is not None and prev_des is not None and des is not None:
-            matches = bf.match(prev_des, des)
-            matches = sorted(matches, key=lambda x: x.distance)
-            if len(matches) >= min_matches:
-                src_pts = np.float32([prev_kp[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
-                dst_pts = np.float32([kp[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
-                try:
-                    H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
-                    if H is not None:
-                        dx = H[0, 2]
-                        dy = H[1, 2]
-                        da = np.arctan2(H[1, 0], H[0, 0])
-                        motion_magnitude = np.sqrt(dx ** 2 + dy ** 2) + abs(da)
-                        if motion_magnitude > homography_threshold:
-                            global_change = True
-                except cv2.error:
-                    pass
+        global_change, matches, H = compute_homography_and_motion(prev_kp, prev_des, kp, des, bf, min_matches, homography_threshold)
         # Sınıflandırma
         if global_change and local_change:
             camera_movement_indices.append(idx)
@@ -237,7 +231,7 @@ def detect_motion_robust(
         cam_vis = frame.copy()
         if prev_gray is not None:
             flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
-            mag, ang = cv2.cartToPolar(flow[...,0], flow[...,1])
+            mag, _ = cv2.cartToPolar(flow[...,0], flow[...,1])
             mean_mag = np.mean(mag)
             if mean_mag > cam_motion_thresh:
                 cam_move = True
@@ -268,59 +262,3 @@ def detect_motion_robust(
             object_annotated.append(obj_vis)
         prev_gray = gray
     return camera_movement_indices, object_movement_indices, camera_annotated, object_annotated
-
-
-# Hızlı griye çevirme
-def to_gray(frame):
-    if len(frame.shape) == 2:
-        return frame
-    if frame.shape[-1] == 1:
-        return frame[..., 0]
-    if frame.shape[-1] == 4:
-        frame = frame[..., :3]
-    return cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY) if frame[...,0].max()>1 else frame
-
-
-# Optimize edilmiş hareket tespiti
-# Sadece optik akış (kamera) ve MOG2+kontur (nesne)
-def detect_motion_fast(frames, cam_motion_thresh=2.0, obj_area_thresh=500):
-    cam_idx, obj_idx, cam_annotated, obj_annotated = [], [], [], []
-    prev_gray = None
-    fgbg = cv2.createBackgroundSubtractorMOG2(history=50, varThreshold=60, detectShadows=False)
-    for idx, frame in enumerate(frames):
-        gray = to_gray(frame)
-        # Kamera hareketi: optik akış
-        cam_move = False
-        cam_vis = frame.copy()
-        if prev_gray is not None:
-            flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
-            mag, _ = cv2.cartToPolar(flow[...,0], flow[...,1])
-            mean_mag = np.mean(mag)
-            if mean_mag > cam_motion_thresh:
-                cam_move = True
-                if idx % 3 == 0:  # Görselleştirme yükünü azalt
-                    step = 24
-                    for y in range(0, flow.shape[0], step):
-                        for x in range(0, flow.shape[1], step):
-                            fx, fy = flow[y, x]
-                            cv2.arrowedLine(cam_vis, (x, y), (int(x+fx), int(y+fy)), (0,0,255), 1, tipLength=0.4)
-        if cam_move:
-            cam_idx.append(idx)
-            cam_annotated.append(cam_vis)
-        # Nesne hareketi: MOG2 + kontur
-        fgmask = fgbg.apply(frame)
-        th = cv2.threshold(fgmask, 200, 255, cv2.THRESH_BINARY)[1]
-        contours, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        obj_vis = frame.copy()
-        found_obj = False
-        for cnt in contours:
-            area = cv2.contourArea(cnt)
-            if area > obj_area_thresh:
-                found_obj = True
-                x, y, w, h = cv2.boundingRect(cnt)
-                cv2.rectangle(obj_vis, (x, y), (x+w, y+h), (0,255,0), 2)
-        if found_obj:
-            obj_idx.append(idx)
-            obj_annotated.append(obj_vis)
-        prev_gray = gray
-    return cam_idx, obj_idx, cam_annotated, obj_annotated
