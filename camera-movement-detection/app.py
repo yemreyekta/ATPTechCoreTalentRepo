@@ -206,8 +206,10 @@ if uploaded_files:
             cam_idx, obj_idx = process_image_file(uploaded_file, cam_motion_thresh, obj_area_thresh, show_cam_visuals, show_obj_visuals)
         all_cam_idx.extend(cam_idx)
         all_obj_idx.extend(obj_idx)
-    st.write(f"Kamera hareketi tespit edilen kareler: {all_cam_idx}")
-    st.write(f"Nesne hareketi tespit edilen kareler: {all_obj_idx}")
+
+    # İndeksler yukarıda, dosya işlendikten sonra gösterilecek
+    st.success(f"Kamera hareketi tespit edilen kareler: {all_cam_idx}")
+    st.success(f"Nesne hareketi tespit edilen kareler: {all_obj_idx}")
 
     def get_download_link(indices, label):
         indices_str = ",".join(map(str, indices))
