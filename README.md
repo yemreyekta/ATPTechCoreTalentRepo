@@ -71,7 +71,7 @@ Welcome to an advanced solution for detecting **significant camera movement**—
 
 | Input | Camera Movement Visual | Object Movement Visual |
 |-------|-----------------------|-----------------------|
-| ![Input Example](camera-movement-detection\sample_video\shaking_timed_panning_output.mp4) | ![Camera Movement](camera-movement-detection/images/fc72c2c62ca44a1642a7f6281b96caa1500fa98cd8ebfd57f2bd7b6c.jpg) | ![Object Movement](camera-movement-detection/images/e9eb0d02ec2e4d6da53232ded94b25445cfc4d3eeb21b45d866b5272.jpg) |
+| ![Input Example](camera-movement-detection/sample_video/shaking_timed_panning_output.mp4) | ![Camera Movement](camera-movement-detection/images/fc72c2c62ca44a1642a7f6281b96caa1500fa98cd8ebfd57f2bd7b6c.jpg) | ![Object Movement](camera-movement-detection/images/e9eb0d02ec2e4d6da53232ded94b25445cfc4d3eeb21b45d866b5272.jpg) |
 
 ---
 
