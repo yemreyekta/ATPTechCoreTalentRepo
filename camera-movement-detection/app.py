@@ -78,6 +78,8 @@ if uploaded_files:
 
     st.write(f"{len(all_frames)} kare yüklendi.")
     cam_idx, obj_idx = [], []
+    cam_idx_placeholder = st.empty()
+    obj_idx_placeholder = st.empty()
     with st.spinner("Analiz yapılıyor, lütfen bekleyin..."):
         progress = st.empty()
         total = len(all_frames)
@@ -110,6 +112,7 @@ if uploaded_files:
                             cv2.arrowedLine(cam_vis, (x, y), (int(x+fx), int(y+fy)), (0,0,255), 1, tipLength=0.4)
             if cam_move:
                 cam_idx.append(idx)
+                cam_idx_placeholder.write(f"Kamera hareketi tespit edilen kareler: {cam_idx}")
                 if show_cam_visuals:
                     with st_cam:
                         st.image(cam_vis, caption=f"Kamera hareketi: Kare {idx}", use_container_width=True)
@@ -128,13 +131,12 @@ if uploaded_files:
                     cv2.drawContours(obj_vis, [cnt], -1, (255,0,0), 1)
             if found_obj:
                 obj_idx.append(idx)
+                obj_idx_placeholder.write(f"Nesne hareketi tespit edilen kareler: {obj_idx}")
                 if show_obj_visuals:
                     with st_obj:
                         st.image(obj_vis, caption=f"Nesne hareketi: Kare {idx}", use_container_width=True)
             prev_gray = gray
         progress.empty()
-    st.write(f"Kamera hareketi tespit edilen kareler: {cam_idx}")
-    st.write(f"Nesne hareketi tespit edilen kareler: {obj_idx}")
 
     def get_download_link(indices, label):
         indices_str = ",".join(map(str, indices))
