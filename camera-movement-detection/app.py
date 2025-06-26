@@ -77,14 +77,17 @@ if uploaded_files:
         all_frames.extend(frames)
 
     st.write(f"{len(all_frames)} kare yüklendi.")
-    cam_idx, obj_idx, cam_annotated, obj_annotated = [], [], [], []
+    cam_idx, obj_idx = [], []
     with st.spinner("Analiz yapılıyor, lütfen bekleyin..."):
         progress = st.empty()
         total = len(all_frames)
-        # Kendi döngümüzle kare kare analiz ve info güncelleme
         import movement_detector as md
         prev_gray = None
         fgbg = cv2.createBackgroundSubtractorMOG2(history=100, varThreshold=50, detectShadows=False)
+        if show_cam_visuals:
+            st_cam = st.container()
+        if show_obj_visuals:
+            st_obj = st.container()
         for idx, frame in enumerate(all_frames):
             progress.info(f"Analiz edilen kare: {idx+1}/{total}")
             if frame.shape[-1] == 3:
@@ -107,7 +110,9 @@ if uploaded_files:
                             cv2.arrowedLine(cam_vis, (x, y), (int(x+fx), int(y+fy)), (0,0,255), 1, tipLength=0.4)
             if cam_move:
                 cam_idx.append(idx)
-                cam_annotated.append(cam_vis)
+                if show_cam_visuals:
+                    with st_cam:
+                        st.image(cam_vis, caption=f"Kamera hareketi: Kare {idx}", use_container_width=True)
             # Nesne hareketi: MOG2 + kontur
             fgmask = fgbg.apply(frame)
             th = cv2.threshold(fgmask, 200, 255, cv2.THRESH_BINARY)[1]
@@ -123,7 +128,9 @@ if uploaded_files:
                     cv2.drawContours(obj_vis, [cnt], -1, (255,0,0), 1)
             if found_obj:
                 obj_idx.append(idx)
-                obj_annotated.append(obj_vis)
+                if show_obj_visuals:
+                    with st_obj:
+                        st.image(obj_vis, caption=f"Nesne hareketi: Kare {idx}", use_container_width=True)
             prev_gray = gray
         progress.empty()
     st.write(f"Kamera hareketi tespit edilen kareler: {cam_idx}")
@@ -140,12 +147,3 @@ if uploaded_files:
 
     st.markdown(get_download_link(cam_idx, "kamera_hareket"), unsafe_allow_html=True)
     st.markdown(get_download_link(obj_idx, "nesne_hareket"), unsafe_allow_html=True)
-
-    if show_cam_visuals and cam_annotated:
-        st.subheader("Kamera Hareketi Görselleştirmeleri (Optik Akış)")
-        for idx, annotated in zip(cam_idx, cam_annotated):
-            st.image(annotated, caption=f"Kamera hareketi: Kare {idx}", use_container_width=True)
-    if show_obj_visuals and obj_annotated:
-        st.subheader("Nesne Hareketi Görselleştirmeleri (Kontur & Kutu)")
-        for idx, annotated in zip(obj_idx, obj_annotated):
-            st.image(annotated, caption=f"Nesne hareketi: Kare {idx}", use_container_width=True)
