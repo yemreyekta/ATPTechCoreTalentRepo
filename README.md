@@ -5,91 +5,111 @@
 
 ---
 
-## Scenario
+## Overview
 
-Imagine you are tasked with building a component for a smart camera system. Your goal is to detect **significant movement**—for example, if someone moves or tilts the camera or if the entire camera is knocked or shifted. This is different from simply detecting moving objects in the scene.
-
----
-
-## Requirements
-
-1. **Input:**
-
-   * A sequence of images or frames (at least 10-20), simulating a fixed camera, with some frames representing significant camera movement (tilt, pan, large translation), and others showing a static scene or minor background/object motion.
-   * You may use public datasets, generate synthetic data, or simulate with your own webcam.
-
-     * Example: [CameraBench Dataset on Hugging Face](https://huggingface.co/datasets/syCen/CameraBench)
-2. **Task:**
-
-   * Build an algorithm (**Python preferred**) that analyzes consecutive frames and detects when significant camera movement occurs.
-   * Output a list of frames (by index/number) where significant movement is detected.
-3. **Expected Features:**
-
-   * **Basic:** Frame differencing or feature matching to detect large global shifts (e.g., using OpenCV’s ORB/SIFT/SURF, optical flow, or homography).
-   * **Bonus:** Distinguish between camera movement and object movement within the scene (e.g., use keypoint matching, estimate transformation matrices, etc.).
-4. **Deployment:**
-
-   * Wrap your solution in a small web app (**Streamlit, Gradio, or Flask**) that allows the user to upload a sequence of images (or a video), runs the detection, and displays the result.
-   * Deploy the app on a public platform (**Vercel, Streamlit Cloud, Hugging Face Spaces**, etc.)
-5. **Deliverables:**
-
-   * Public app URL
-   * GitHub repo (with code and requirements.txt)
-   * README (explaining your approach, dataset, and how to use the app)
-
-     * **Sample README Outline:**
-
-       * Overview of your approach and movement detection logic
-       * Any challenges or assumptions
-       * How to run the app locally
-       * Link to the live app
-       * Example input/output screenshots
-   * AI Prompts or Chat History (if used for support)
+This project implements a robust solution for detecting **significant camera movement** (such as tilting, panning, or shifting the entire camera) as opposed to just object movement within a scene. The solution uses computer vision techniques to distinguish between global (camera) and local (object) motion, and provides a user-friendly web interface for testing and demonstration.
 
 ---
 
-## Evaluation Rubric
+## Approach & Movement Detection Logic
 
-| Criteria           | Points | Details                                                                                    |
-| ------------------ | ------ | ------------------------------------------------------------------------------------------ |
-| **Correctness**    | 5      | Accurately detects significant camera movement; low false positives/negatives.             |
-| **Implementation** | 5      | Clean code, good use of OpenCV or relevant libraries, modular structure.                   |
-| **Deployment**     | 5      | App is online, easy to use, and functions as described.                                    |
-| **Innovation**     | 3      | Advanced techniques (feature matching, transformation estimation, clear object vs camera). |
-| **Documentation**  | 2      | Clear README, instructions, and concise explanation of method/logic.                       |
-
----
-
-## Suggested Stack
-
-* **Python** or **C#**
-* **OpenCV** for computer vision
-* **Streamlit**, **Gradio**, or a **shadcn-powered Vercel site** for quick web UI
-* **GitHub** for code repo, **Streamlit Cloud**, **Hugging Face Spaces**, or **Vercel** for deployment
+- **Frame Differencing & Optical Flow:**
+  - The algorithm analyzes consecutive frames using frame differencing and dense optical flow (Farneback) to estimate global motion.
+  - If the average optical flow magnitude exceeds a threshold, the frame is marked as having significant camera movement.
+- **Object Movement Detection:**
+  - Background subtraction (MOG2) and contour analysis are used to detect moving objects within the scene.
+  - If large enough contours are found, the frame is marked as containing object movement.
+- **Visualization:**
+  - Detected camera movements are visualized with flow vectors.
+  - Object movements are visualized with bounding boxes and contours.
+- **Efficiency:**
+  - Annotated frames are displayed immediately and not stored in memory, preventing RAM overload for long videos.
+  - Detected indices are updated live at the top of the app.
 
 ---
 
-# 📋 Candidate Instructions
+## Challenges & Assumptions
 
-1. **Fork this repository** (or start your own repository with the same structure).
-2. **Implement your movement detection algorithm** in `movement_detector.py`.
-3. **Develop a simple web app** (`app.py`) that allows users to upload images/sequences and view detection results.
-4. **Deploy your app** on a public platform (e.g., Streamlit Cloud, Hugging Face Spaces, Vercel, Heroku) and **share both your deployed app URL and GitHub repository link**.
-5. **Document your work**: Include a `README.md` that explains your approach, how to run your code, and sample results (with screenshots or example outputs).
-
----
-
-**Deadline:**
-🕓 **27.06.2025**
+- **Assumptions:**
+  - Input is a sequence of images or a video simulating a fixed camera, with some frames containing significant camera movement.
+  - Minor object/background motion should not trigger camera movement detection.
+- **Challenges:**
+  - Distinguishing between global (camera) and local (object) motion, especially in scenes with both.
+  - Efficient memory usage for long videos or large image sequences.
+  - Providing real-time feedback in the web interface.
 
 ---
 
-**Plagiarism Policy:**
+## How to Run the App Locally
 
-* This must be **individual, AI-powered work**.
-* You may use open-source libraries, but you **must cite** all external resources and code snippets.
-* Do not submit work copied from others or from the internet without proper acknowledgment.
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/yemreyekta/ATPTechCoreTalentRepo
+   cd ATPTechCoreTalentRepo/camera-movement-detection
+   ```
+2. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. **Run the Streamlit app:**
+   ```bash
+   streamlit run app.py
+   ```
+4. **Usage:**
+   - Upload a video (mp4/gif) or a sequence of images.
+   - The app will analyze the frames and display detected camera/object movements and their indices live.
 
 ---
 
-**Good luck! Show us your best hands-on AI skills!**
+## Live App
+
+[Live Demo (Streamlit Cloud)] https://atptechcoretalentrepo-yunusemreyekta.streamlit.app/
+
+---
+
+## Example Input/Output Screenshots
+
+- **Input:**
+  - Video or image sequence simulating camera shake, pan, or tilt.
+- **Output:**
+  - List of frame indices with detected camera/object movement (displayed live at the top).
+  - Visualizations of detected movements (optical flow for camera, bounding boxes for objects).
+
+*Add screenshots here*
+
+---
+
+## Example Results
+
+| Input | Camera Movement Visual | Object Movement Visual |
+|-------|-----------------------|-----------------------|
+| ![Input Example](camera-movement-detection\sample_video\shaking_timed_panning_output.mp4) | ![Camera Movement](camera-movement-detection\images\fc72c2c62ca44a1642a7f6281b96caa1500fa98cd8ebfd57f2bd7b6c.jpg) | ![Object Movement](camera-movement-detection\images\e9eb0d02ec2e4d6da53232ded94b25445cfc4d3eeb21b45d866b5272.jpg) |
+
+---
+
+## AI Prompts / Chat History
+
+- This project was developed with the support of AI prompts.
+1. Refactor the function detect_significant_movement to follow cleaner functional separation. Add preprocessing (e.g., grayscale conversion), frame differencing, and scoring as separate functions. Include docstrings and type hints for all new functions.
+2. Implement a function using OpenCV ORB to compute keypoints and descriptors for each frame. Then compute matches between consecutive frames, estimate homography, and use the transformation magnitude to decide significant camera movement.
+Return the index of frames where global motion exceeds a configurable threshold.
+3. Enhance the movement detection by distinguishing object movement from camera motion.
+Use keypoint matching and homography estimation between frames. If homography indicates global movement and frame differencing suggests local changes, classify the movement as camera-induced.
+Return two separate lists: one for significant camera movement, another for local object changes.
+4. Overlay matched keypoints or transformation vectors on the frames where significant camera movement is detected.
+Create a helper function that annotates the image with visual feedback (e.g., matched points or bounding boxes), and return it alongside the detection result.
+5. Enhance the Streamlit UI to include:
+- A sidebar to adjust the movement threshold interactively
+- A toggle to display visualized frames with overlays (e.g., keypoints or differences)
+- A download button for exporting the list of detected frames
+Make sure the app handles variable image sizes and grayscale inputs.
+6. Write a README file according to developments.
+
+---
+
+## Citation & Credits
+
+- Uses OpenCV, Streamlit, and PIL.
+- Inspired by the [CameraBench Dataset](https://huggingface.co/datasets/syCen/CameraBench) for testing.
+- https://docs.opencv.org/3.4/d5/dab/tutorial_sfm_trajectory_estimation.html
+- https://hackmd.io/@lKuOpplzSUWLhLim2Z7ZJw/ryTpNXeGn
