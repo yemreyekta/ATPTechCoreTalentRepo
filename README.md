@@ -14,19 +14,18 @@ Welcome to an advanced solution for detecting **significant camera movement**—
 ## 🧠 Approach & Movement Detection Logic
 
 - **Frame Differencing & Optical Flow:**
-  - Consecutive frames are analyzed using frame differencing and dense optical flow (Farneback) to estimate global motion.
-  - If the average optical flow magnitude surpasses a set threshold, the frame is flagged for significant camera movement.
+  - Consecutive frames are compared using frame differencing and dense optical flow (Farneback) to estimate global (camera) motion.
+  - If the average optical flow magnitude exceeds a defined threshold, the frame is flagged as having significant camera movement.
 - **Object Movement Detection:**
-  - Background subtraction (MOG2) and contour analysis are employed to spot moving objects within the scene.
-  - Frames with sufficiently large contours are marked as containing object movement.
+  - Background subtraction (MOG2) and contour analysis are used to detect moving objects within the scene.
+  - Frames with large enough contours are marked as containing object movement.
 - **Visualization:**
   - Camera movements are visualized with dynamic flow vectors.
-  - Object movements are highlighted with bounding boxes and contours for clear insight.
-- **Efficiency:**
-  - Annotated frames are displayed instantly and not stored in memory, ensuring smooth performance even with long videos.
+  - Object movements are highlighted with bounding boxes and contours for clarity.
 - **Efficiency & Memory Handling:**
-  - **How I Dealt with Memory Issues:** Instead of storing all annotated frames in memory and displaying them in bulk at the end (which can cause memory overload for long videos or large datasets), each processed frame with detected movement is immediately displayed to the user. This real-time, per-frame visualization ensures that memory usage remains low and the app remains responsive, even with large or lengthy inputs.
-  - Detected indices are updated live at the top of the app for real-time feedback.
+  - Annotated frames are displayed immediately and not stored in memory, which ensures smooth performance even for long videos.
+  - **Memory Management:** Instead of accumulating all annotated frames in memory and displaying them at the end (which could cause memory issues for long videos or large datasets), each processed frame with detected movement is shown to the user right away. This real-time, per-frame visualization keeps memory usage low and the app responsive, even with large or lengthy inputs.
+  - Detected indices are updated live at the top of the app for instant feedback.
 
 ---
 
