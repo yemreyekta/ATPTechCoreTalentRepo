@@ -24,6 +24,8 @@ Welcome to an advanced solution for detecting **significant camera movement**—
   - Object movements are highlighted with bounding boxes and contours for clear insight.
 - **Efficiency:**
   - Annotated frames are displayed instantly and not stored in memory, ensuring smooth performance even with long videos.
+- **Efficiency & Memory Handling:**
+  - **How I Dealt with Memory Issues:** Instead of storing all annotated frames in memory and displaying them in bulk at the end (which can cause memory overload for long videos or large datasets), each processed frame with detected movement is immediately displayed to the user. This real-time, per-frame visualization ensures that memory usage remains low and the app remains responsive, even with large or lengthy inputs.
   - Detected indices are updated live at the top of the app for real-time feedback.
 
 ---
@@ -69,9 +71,9 @@ Welcome to an advanced solution for detecting **significant camera movement**—
 
 ## 🎬 Example Results
 
-| Input | Camera Movement Visual | Object Movement Visual |
-|-------|-----------------------|-----------------------|
-| ![Input Example](camera-movement-detection/sample_video/shaking_timed_panning_output.mp4) | ![Camera Movement](camera-movement-detection/images/fc72c2c62ca44a1642a7f6281b96caa1500fa98cd8ebfd57f2bd7b6c.jpg) | ![Object Movement](camera-movement-detection/images/e9eb0d02ec2e4d6da53232ded94b25445cfc4d3eeb21b45d866b5272.jpg) |
+| Camera Movement Visual | Object Movement Visual |
+|-----------------------|-----------------------|
+| ![Camera Movement](camera-movement-detection/images/fc72c2c62ca44a1642a7f6281b96caa1500fa98cd8ebfd57f2bd7b6c.jpg) | ![Object Movement](camera-movement-detection/images/e9eb0d02ec2e4d6da53232ded94b25445cfc4d3eeb21b45d866b5272.jpg) |
 
 ---
 
